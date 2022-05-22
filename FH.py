@@ -15,7 +15,7 @@ def help():
 	print('	spinodal(chi, n = 1): returns spinodal concentrations [p1, p2, chi] in the valid chi range\n')
 	print('	GL_binodal(chi, n = 1): Ginzburg-Landau binodal [p1, p2, chi]\n')
 	print('	binodal(chi, n = 1, iteration = 5, UseImprovedMap = True): self-consistent solution with speficied number of iterations [p1, p2, chi]. You can also use the simple map to see what it does\n')
-	print(' analytic_binodal(x, n = 1, UseImprovedMap = True): analytic forms')
+	print(' analytic_binodal(x, n = 1): analytic forms')
 
 def critical(n = 1):
 
@@ -39,11 +39,14 @@ def spinodal(x, n = 1):
 		else:
 			raise ValueError('interaction strength too small - no LLPS!')
 	else:
-		x = np.array(x)
-		x = x[x >= x_c]
-		t1 = 1./2. - gamma / (4. * x)
-		t2 = np.sqrt(np.power(t1, 2) - 1./(2. * x * n))
-		return np.array([t1 + t2, t1 - t2, x])
+		if max(x)<x_c:
+			raise ValueError('interaction strength too small - no LLPS!')
+		else:
+			x = np.array(x)
+			x = x[x >= x_c]
+			t1 = 1./2. - gamma / (4. * x)
+			t2 = np.sqrt(np.power(t1, 2) - 1./(2. * x * n))
+			return np.array([t1 + t2, t1 - t2, x])
 
 def GL_binodal(x, n = 1):
 
@@ -59,11 +62,14 @@ def GL_binodal(x, n = 1):
 		else:
 			raise ValueError('interaction strength too small - no LLPS!')
 	else:
-		x = np.array(x)
-		x = x[x >= x_c]
-		t1 = phi_c
-		t2 = np.sqrt(3. * (x - x_c) / (2. * np.power(x_c, 2) * np.sqrt(n)))
-		return np.array([t1 + t2, t1 - t2, x])
+		if max(x)<x_c:
+			raise ValueError('interaction strength too small - no LLPS!')
+		else:
+			x = np.array(x)
+			x = x[x >= x_c]
+			t1 = phi_c
+			t2 = np.sqrt(3. * (x - x_c) / (2. * np.power(x_c, 2) * np.sqrt(n)))
+			return np.array([t1 + t2, t1 - t2, x])
 
 def binodal(x, n = 1, iteration = 5, UseImprovedMap = True):
 
@@ -155,40 +161,64 @@ def analytic_binodal(x, n = 1):
 
 	crit = critical(n)
 	x_c = crit[1]
-	phi_c = crit[0]
-	gamma = 1. - 1./n
 
-	if n == 1:
+	if not np.array(x).shape:
+		if x > x_c:
+			if n == 1:
+				pp = 1/(1+np.exp(-x * np.tanh(x*np.sqrt(3*(x-2)/8))))
+				pm = 1/(1+np.exp(-x * np.tanh(-x*np.sqrt(3*(x-2)/8))))
 
-		guess = GL_binodal(x)
+			else:
 
-		pm = guess[1]
-		xx = guess[2]
-		
-		p0 = 0.5 * (pm + np.abs(pm))
-		ee = np.exp(- 2 * xx * p0 + xx)
-		pm = 1/(1 + ee)
+				a = n ** 0.25
+				D = (x - x_c) / x_c
 
-		return np.array([1 - pm, pm, xx])
+				c = (a + 1/a) / 2
+				s = (a - 1/a) / 2
 
-	if n > 1:
+				cothA = 1/np.tanh((1+D/a**2)*np.sqrt(3*D)/a)
+				cothB = 1/np.tanh((1+D*a**2)*np.sqrt(3*D)*a)
 
-		guess = GL_binodal(x, n = n)
+				prefactor = c/(cothA+cothB)
 
-		pp = guess[0]
-		pm = guess[1]
-		xx = guess[2]
+				numerator_exp = 8 * prefactor * (s/a**2 + (1+D) * prefactor * cothB / a**2)
+				denominator_exp = 8 * prefactor * (s*(1/a**2 - a**2)+(1+D)*prefactor*(cothB/a**2+a**2*cothA))
 
-		p0 = 0.5 * (pm + np.abs(pm))
-	
-		a = np.exp( - 2. * xx * (pp - p0))
-		b = np.exp( - gamma * (pp - p0) - xx * (np.power(pp,2) - np.power(p0,2)))
-		c = np.power(a/b, n)
-	
-		g1 = (1. - b)/(1. - np.power(a/b, n) * b)
-		g2 = (1. - b)/(np.power(b/a, n) - b)
+				pp = (1-np.exp(-numerator_exp))/(1-np.exp(-denominator_exp))
+				pm = (1-np.exp(+numerator_exp))/(1-np.exp(+denominator_exp))
 
-		pm = np.copy((1. - b)/(np.power(b/a, n) - b))
-		pp = np.copy((1. - b)/(1 - np.power(a/b, n) * b))
+			return np.array([pp, pm])
 
-		return np.array([pp, pm, xx])
+		else:
+			raise ValueError('interaction strength too small - no LLPS!')
+	else:
+		if max(x)<x_c:
+			raise ValueError('interaction strength too small - no LLPS!')
+		else:
+			x = np.array(x)
+			x = x[x >= x_c]
+
+			if n == 1:
+				pp = 1/(1+np.exp(-x * np.tanh(x*np.sqrt(3*(x-2)/8))))
+				pm = 1/(1+np.exp(-x * np.tanh(-x*np.sqrt(3*(x-2)/8))))
+
+			else:
+
+				a = n ** 0.25
+				D = (x - x_c) / x_c
+
+				c = (a + 1/a) / 2
+				s = (a - 1/a) / 2
+
+				cothA = 1/np.tanh((1+D/a**2)*np.sqrt(3*D)/a)
+				cothB = 1/np.tanh((1+D*a**2)*np.sqrt(3*D)*a)
+
+				prefactor = c/(cothA+cothB)
+
+				numerator_exp = 8 * prefactor * (s/a**2 + (1+D) * prefactor * cothB / a**2)
+				denominator_exp = 8 * prefactor * (s*(1/a**2 - a**2)+(1+D)*prefactor*(cothB/a**2+a**2*cothA))
+
+				pp = (1-np.exp(-numerator_exp))/(1-np.exp(-denominator_exp))
+				pm = (1-np.exp(+numerator_exp))/(1-np.exp(+denominator_exp))
+
+			return np.array([pp, pm, x])
